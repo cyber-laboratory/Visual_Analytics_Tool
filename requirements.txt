@@ -1,0 +1,9 @@
+Flask
+scapy
+dpkt==1.9.8
+pandas
+joblib
+tensorflow
+orjson
+cicflowmeter
+scikit-learn

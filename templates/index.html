@@ -1,0 +1,273 @@
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual Analytics Tool</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-top">
+      <h1 class="site-title">Visual Analytics Tool</h1>
+      <div class="header-controls">
+        <div class="control-group">
+          <label for="algorithmSelect" class="control-label">Algorithm:</label>
+          <select id="algorithmSelect" class="algorithm-selector" autocomplete="off">
+            <option value="dtw" selected>DTW (Dynamic Time Warping)</option>
+            <option value="lstm">LSTM (Malicious Rate Forecast)</option>
+            <option value="gru">GRU (Malicious Rate Forecast)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="file-upload-group">
+        <div class="file-card">
+          <div class="file-card-row">
+            <span class="file-card-role">Host_A</span>
+            <label class="file-browse-btn" for="host_AInput">Browse…</label>
+            <input type="file" id="host_AInput" accept=".pcap,.pcapng,.csv" class="file-input-native">
+          </div>
+          <div id="host_AFileInfo" class="file-name-display"><span class="file-name-empty">No file selected</span></div>
+        </div>
+        <div class="file-card">
+          <div class="file-card-row">
+            <span class="file-card-role">Host_B</span>
+            <label class="file-browse-btn" for="host_BInput">Browse…</label>
+            <input type="file" id="host_BInput" accept=".pcap,.pcapng,.csv" class="file-input-native">
+          </div>
+          <div id="host_BFileInfo" class="file-name-display"><span class="file-name-empty">No file selected</span></div>
+        </div>
+      </div>
+      <div class="button-group">
+        <button id="uploadBtn" class="btn-primary">Upload</button>
+        <button id="clearBtn" class="btn-secondary">Clear</button>
+      </div>
+      <span class="upload-hint">Accepted file types: .pcap and .csv. Upload both or one if combined</span>
+    </div>
+  </header>
+
+  <main class="main-container">
+    <section class="graph-container">
+      <div class="dtw-panel-header">
+        <div>
+          <h3>Packet Density</h3>
+          <p>Packets per second across the uploaded capture(s).</p>
+        </div>
+      </div>
+      <div class="density-chart">
+        <div id="packetDensityChart"></div>
+      </div>
+    </section>
+
+    <section class="dtw-params-panel">
+      <details open>
+        <summary>DTW Parameters</summary>
+
+        <div class="dtw-params-body">
+
+          <div class="dtw-params-side">
+
+            <div class="dtw-param-group">
+              <span class="dtw-param-label" title="Only one column can be selected - it is the value the DTW alignment (and the plot) compares packets on.">DTW column</span>
+              <div class="dtw-param-controls">
+                <label class="col-pill"><input type="radio" name="dtwCol" class="dtwCol" value="len" checked> Length</label>
+                <label class="col-pill"><input type="radio" name="dtwCol" class="dtwCol" value="src_port"> Src Port</label>
+                <label class="col-pill"><input type="radio" name="dtwCol" class="dtwCol" value="dst_port"> Dst Port</label>
+                <label class="col-pill"><input type="radio" name="dtwCol" class="dtwCol" value="payload_len"> Payload Len</label>
+                <label class="col-pill"><input type="radio" name="dtwCol" class="dtwCol" value="ttl"> TTL</label>
+                <label class="col-pill"><input type="radio" name="dtwCol" class="dtwCol" value="window"> TCP Window</label>
+                <label class="col-pill"><input type="radio" name="dtwCol" class="dtwCol" value="ulen"> UDP Len</label>
+                <label class="col-pill"><input type="radio" name="dtwCol" class="dtwCol" value="icmp_type"> ICMP Type</label>
+              </div>
+            </div>
+
+            <div class="dtw-param-group">
+              <span class="dtw-param-label">Sliding window parameters<span class="param-hint"></span></span>
+              <div class="dtw-param-controls">
+                <label class="score-field">Window size
+                  <input type="number" id="windowSize" placeholder="e.g. 250" min="2" value="250">
+                </label>
+                <label class="score-field">Stride
+                  <input type="number" id="windowStride" placeholder="e.g. 20" min="1" value="20">
+                </label>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="dtw-params-side">
+
+            <div class="dtw-param-group dtw-param-group--filter">
+              <span class="dtw-param-label">IP filter</span>
+              <div class="dtw-param-controls">
+                <div id="ipBothControls" class="ip-inputs">
+                  <div class="ip-field">
+                    <label class="score-field">Host_A IP
+                      <input id="dtwHost_AIp" type="text" placeholder="Any" autocomplete="off" readonly>
+                    </label>
+                    <div class="ip-role-toggles" title="Leave both unchecked to match this IP as either source or destination.">
+                      <label class="ip-role-toggle"><input type="checkbox" id="dtwHost_ASrc"> Source</label>
+                      <label class="ip-role-toggle"><input type="checkbox" id="dtwHost_ADst"> Destination</label>
+                    </div>
+                  </div>
+                  <div class="ip-field">
+                    <label class="score-field">Host_B IP
+                      <input id="dtwHost_BIp" type="text" placeholder="Any" autocomplete="off" readonly>
+                    </label>
+                    <div class="ip-role-toggles" title="Leave both unchecked to match this IP as either source or destination.">
+                      <label class="ip-role-toggle"><input type="checkbox" id="dtwHost_BSrc"> Source</label>
+                      <label class="ip-role-toggle"><input type="checkbox" id="dtwHost_BDst"> Destination</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="dtw-param-group dtw-param-group--filter">
+              <span class="dtw-param-label">Packet filter</span>
+              <div class="dtw-param-controls">
+                <div class="filter-toolbar">
+                  <div class="seg-tabs seg-tabs--logic">
+                    <label class="seg-tab"><input type="radio" name="dtwLogic" value="AND" checked> AND</label>
+                    <label class="seg-tab"><input type="radio" name="dtwLogic" value="OR"> OR</label>
+                  </div>
+                  <button type="button" id="addConditionBtn">+ Add condition</button>
+                </div>
+                <div id="dtwConditions"></div>
+                <label class="dtw-nonzero-toggle" title="Drops packets where the selected DTW column is missing or zero (e.g. TCP window on a UDP packet) before alignment, instead of comparing them as meaningless zero values.">
+                  <input type="checkbox" id="dtwNonzeroColumn"> Only non-zero values
+                </label>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </details>
+    </section>
+
+    <section class="dtw-warping-container">
+      <div class="dtw-panel">
+        <div class="dtw-panel-header">
+          <div>
+            <h3>Warping Plot (interactive)</h3>
+            <p>Click a host_A/host_B marker for aligned-packet details.</p>
+          </div>
+          <div class="dtw-warp-controls">
+            <div id="dtwWindowPager" class="dtw-window-pager" style="display:none">
+              <button id="dtwWindowPrev" type="button" class="zoom-btn" title="Previous window">‹</button>
+              <span id="dtwWindowLabel" class="dtw-window-label"></span>
+              <button id="dtwWindowNext" type="button" class="zoom-btn" title="Next window">›</button>
+              <label for="dtwWindowJump" class="dtw-window-jump-label">Jump to window:</label>
+              <input id="dtwWindowJump" type="number" min="1" class="dtw-window-jump" title="Jump to window number" placeholder="#">
+              <button id="dtwWindowGo" type="button" class="zoom-btn" title="Jump to window">Go</button>
+            </div>
+            <button id="refreshWarpBtn" type="button">Refresh Warping</button>
+          </div>
+        </div>
+        <div class="dtw-plot-wrap">
+          <div id="dtwWarping" class="dtw-plot"></div>
+          <div id="dtwWarpingLoading" class="section-loading-overlay" style="display:none">
+            <div class="spinner"></div>
+            <div class="section-loading-text">Refreshing warping…</div>
+          </div>
+        </div>
+      </div>
+      <div class="dtw-details-panel">
+        <h3>Warp Pair Details</h3>
+        <pre id="dtwWarpDetails">Click a marker to view aligned host_A/host_B packet details.</pre>
+      </div>
+    </section>
+
+    <section id="forecastSection" class="forecast-container" style="display:none">
+      <div class="forecast-panel">
+        <div class="forecast-params-col">
+          <div class="dtw-param-group">
+            <span class="dtw-param-label">Forecast file</span>
+            <div class="dtw-param-controls forecast-file-row">
+              <select id="forecastFileSelect" class="forecast-file-select">
+                <option value="">- select a file -</option>
+              </select>
+              <button id="refreshFilesBtn" type="button" class="btn-secondary" title="Refresh file list">↺</button>
+            </div>
+          </div>
+
+          <div class="dtw-param-group">
+            <span class="dtw-param-label">
+              Or generate from an upload <span class="param-hint">(needs a PCAP, not a CSV)</span>
+            </span>
+            <div class="forecast-convert-row">
+              <button type="button" id="forecastConvertHost_A" class="btn-secondary" disabled>Use Host_A PCAP</button>
+              <button type="button" id="forecastConvertHost_B" class="btn-secondary" disabled>Use Host_B PCAP</button>
+            </div>
+            <p id="forecastConvertStatus" class="forecast-convert-status"></p>
+            <div id="forecastConvertProgressWrap" class="forecast-convert-progress-wrap" style="display:none">
+              <div class="loading-progress-track"><div id="forecastConvertProgressBar" class="loading-progress-bar"></div></div>
+            </div>
+          </div>
+
+          <div class="dtw-param-group">
+            <span class="dtw-param-label">
+              Hosts <span class="param-hint">(none checked = all)</span>
+            </span>
+            <div class="forecast-ip-filter">
+              <div class="forecast-ip-toolbar">
+                <input type="text" id="forecastIpSearch" placeholder="Filter IPs…" autocomplete="off" disabled>
+                <button type="button" id="forecastIpSelectAll" class="link-btn" disabled>All</button>
+                <button type="button" id="forecastIpSelectNone" class="link-btn" disabled>None</button>
+              </div>
+              <div id="forecastIpList" class="forecast-ip-list">
+                <div class="forecast-ip-placeholder">Select a file to list its hosts.</div>
+              </div>
+              <div id="forecastIpSummary" class="forecast-ip-summary"></div>
+              <p class="forecast-ip-tip">Shift+click a host to select every host between it and your last click.</p>
+            </div>
+          </div>
+
+          <button id="runForecastBtn" type="button" class="btn-primary forecast-run-btn">Run Forecast</button>
+          <div id="forecastStatus" class="forecast-status"></div>
+        </div>
+
+        <div class="forecast-chart-col">
+          <div class="forecast-panel-header">
+            <div>
+              <h3>ML Forecast</h3>
+              <p>Predicted malicious rate per host.</p>
+            </div>
+          </div>
+          <div class="forecast-plot-wrap">
+            <div id="forecastChart" class="forecast-plot"></div>
+            <div id="forecastPinnedCard" class="forecast-pinned-card" style="display:none"></div>
+            <div id="forecastLoading" class="section-loading-overlay" style="display:none">
+              <div class="spinner"></div>
+              <div id="forecastLoadingText" class="section-loading-text">Computing forecast…</div>
+            </div>
+          </div>
+          <div id="forecastViewNote" class="forecast-view-note"></div>
+          <div class="forecast-window-details">
+            <h3>Window Details</h3>
+            <pre id="forecastWindowDetails">Click a point on the chart to view the flow record(s) behind it.</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+
+  <script src="{{ url_for('static', filename='plotly-2.24.1.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <script src="{{ url_for('static', filename='warping.js') }}"></script>
+
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <div id="loadingText" class="loading-text">Working…</div>
+    <div id="loadingProgressWrap" class="loading-progress-wrap" style="display:none">
+      <div class="loading-progress-track"><div id="loadingProgressBar" class="loading-progress-bar"></div></div>
+    </div>
+  </div>
+</body>
+</html>
